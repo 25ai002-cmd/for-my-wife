@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Text To Video Generator</title>
+
+<style>
+
+body{
+background:#0f172a;
+color:white;
+font-family:Arial;
+text-align:center;
+padding:30px;
+}
+
+textarea{
+width:80%;
+height:160px;
+padding:12px;
+font-size:16px;
+border-radius:6px;
+}
+
+button{
+padding:12px 25px;
+margin:10px;
+font-size:16px;
+background:#22c55e;
+border:none;
+border-radius:6px;
+color:white;
+cursor:pointer;
+}
+
+canvas{
+margin-top:25px;
+background:black;
+border-radius:8px;
+}
+
+video{
+margin-top:20px;
+width:640px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>AI Text → Video Generator</h1>
+
+<textarea id="textInput" placeholder="Enter your long text here"></textarea>
+
+<br>
+
+<button onclick="generateVideo()">Generate Video</button>
+
+<br>
+
+<canvas id="canvas" width="640" height="360"></canvas>
+
+<br>
+
+<video id="outputVideo" controls></video>
+
+<br>
+
+<a id="downloadBtn" style="display:none;color:white">Download Video</a>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const videoElement = document.getElementById("outputVideo");
+const downloadBtn = document.getElementById("downloadBtn");
+
+const backgrounds = [
+"https://picsum.photos/640/360?1",
+"https://picsum.photos/640/360?2",
+"https://picsum.photos/640/360?3",
+"https://picsum.photos/640/360?4"
+];
+
+function removeEmojis(text){
+return text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu,'');
+}
+
+function speak(text){
+
+return new Promise(resolve=>{
+
+let speech = new SpeechSynthesisUtterance(text);
+
+speech.rate = 0.95;
+speech.pitch = 0.85; // deeper pitch for male voice
+
+let voices = speechSynthesis.getVoices();
+
+/* Prefer Male Voice */
+
+let maleVoice = voices.find(v =>
+v.name.includes("Google US English") ||
+v.name.includes("Google UK English Male") ||
+v.name.includes("David") ||
+v.name.includes("Mark") ||
+v.name.includes("Microsoft David")
+);
+
+if(maleVoice){
+speech.voice = maleVoice;
+}
+
+speech.onend = resolve;
+
+speechSynthesis.speak(speech);
+
+});
+
+}
+
+async function generateVideo(){
+
+let text = document.getElementById("textInput").value;
+
+if(!text){
+alert("Enter text first");
+return;
+}
+
+text = removeEmojis(text);
+
+let sentences = text.split(".");
+let index = 0;
+
+const stream = canvas.captureStream(30);
+const recorder = new MediaRecorder(stream);
+
+let chunks = [];
+
+recorder.ondataavailable = e => chunks.push(e.data);
+
+recorder.onstop = ()=>{
+
+const blob = new Blob(chunks,{type:"video/webm"});
+const url = URL.createObjectURL(blob);
+
+videoElement.src = url;
+
+downloadBtn.href = url;
+downloadBtn.download = "video.webm";
+downloadBtn.innerText = "Download Video";
+downloadBtn.style.display = "block";
+
+};
+
+recorder.start();
+
+async function renderScene(){
+
+if(index >= sentences.length){
+
+recorder.stop();
+return;
+
+}
+
+let line = sentences[index].trim();
+
+let img = new Image();
+img.src = backgrounds[index % backgrounds.length];
+
+img.onload = async ()=>{
+
+ctx.drawImage(img,0,0,640,360);
+
+ctx.fillStyle="rgba(0,0,0,0.6)";
+ctx.fillRect(0,250,640,100);
+
+ctx.fillStyle="white";
+ctx.font="26px Arial";
+ctx.textAlign="center";
+
+wrapText(line,320,290,580,30);
+
+await speak(line);
+
+index++;
+renderScene();
+
+};
+
+}
+
+renderScene();
+
+}
+
+function wrapText(text,x,y,maxWidth,lineHeight){
+
+let words=text.split(" ");
+let line="";
+
+for(let n=0;n<words.length;n++){
+
+let testLine=line+words[n]+" ";
+let metrics=ctx.measureText(testLine);
+let testWidth=metrics.width;
+
+if(testWidth>maxWidth && n>0){
+
+ctx.fillText(line,x,y);
+line=words[n]+" ";
+y+=lineHeight;
+
+}else{
+
+line=testLine;
+
+}
+
+}
+
+ctx.fillText(line,x,y);
+
+}
+
+</script>
+
+</body>
+</html>
